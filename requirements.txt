@@ -1,0 +1,42 @@
+# ─── Core Framework ───────────────────────────────────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+websockets==13.0
+python-multipart==0.0.9
+
+# ─── Open-Source ASR ──────────────────────────────────────────────────────────
+openai-whisper==20231117
+
+# ─── Open-Source TTS ──────────────────────────────────────────────────────────
+kokoro>=0.9.4
+
+# LLM
+groq
+
+# Silero VAD (open-source, Apache 2.0)
+silero-vad==5.1
+
+# ─── Audio processing ─────────────────────────────────────────────────────────
+sounddevice==0.4.7
+soundfile==0.12.1
+numpy==1.26.4
+scipy==1.13.1
+librosa==0.10.2
+pyaudio==0.2.14
+
+# ─── Observability ────────────────────────────────────────────────────────────
+prometheus-client==0.20.0
+structlog==24.2.0
+
+# ─── Utilities ────────────────────────────────────────────────────────────────
+pydantic==2.7.4
+pydantic-settings==2.3.4
+python-dotenv==1.0.1
+httpx==0.27.0
+asyncio-throttle==1.0.2
+tenacity==8.3.0
+
+# ─── Testing ──────────────────────────────────────────────────────────────────
+pytest==8.2.2
+pytest-asyncio==0.23.7
+pytest-timeout==2.3.1

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Open-Source Voice Assistant</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f0f0f;
+      color: #e8e8e8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+    h1 { font-size: 1.4rem; font-weight: 500; margin-bottom: 0.25rem; }
+    .subtitle { font-size: 0.8rem; color: #666; margin-bottom: 2rem; }
+    .orb-wrap {
+      position: relative;
+      width: 140px; height: 140px;
+      margin: 1.5rem 0;
+    }
+    .orb {
+      width: 140px; height: 140px;
+      border-radius: 50%;
+      background: #1a1a1a;
+      border: 1.5px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.1s;
+      position: relative;
+      overflow: hidden;
+    }
+    .orb:hover { border-color: #555; }
+    .orb.listening {
+      border-color: #7f77dd;
+      animation: pulse-border 1.2s ease-in-out infinite;
+    }
+    .orb.speaking { border-color: #1d9e75; }
+    .orb.processing { border-color: #ef9f27; }
+    @keyframes pulse-border {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(127,119,221,0.3); }
+      50% { box-shadow: 0 0 0 8px rgba(127,119,221,0); }
+    }
+    .orb-icon { font-size: 2.5rem; user-select: none; }
+    .wave-bars {
+      display: flex; gap: 3px; align-items: center;
+      height: 32px;
+      display: none;
+    }
+    .wave-bars.active { display: flex; }
+    .bar {
+      width: 3px; background: #7f77dd; border-radius: 2px;
+      animation: wave-anim 0.8s ease-in-out infinite;
+    }
+    .bar:nth-child(1) { animation-delay: 0s; }
+    .bar:nth-child(2) { animation-delay: 0.1s; }
+    .bar:nth-child(3) { animation-delay: 0.2s; }
+    .bar:nth-child(4) { animation-delay: 0.3s; }
+    .bar:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes wave-anim {
+      0%, 100% { height: 6px; } 50% { height: 28px; }
+    }
+    .status {
+      font-size: 0.8rem; color: #666;
+      margin-bottom: 1.5rem;
+      min-height: 1.2em;
+      text-align: center;
+    }
+    .btn {
+      padding: 0.6rem 1.5rem;
+      border-radius: 999px;
+      border: 1px solid #333;
+      background: transparent;
+      color: #e8e8e8;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .btn:hover { background: #1a1a1a; border-color: #555; }
+    .btn.active { background: #1a0a0a; border-color: #c04848; color: #e88; }
+    .transcript-area {
+      width: 100%; max-width: 540px;
+      margin-top: 2rem;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .bubble {
+      padding: 0.7rem 1rem;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      max-width: 85%;
+      animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } }
+    .bubble.user {
+      align-self: flex-end;
+      background: #1e1e3a;
+      border: 1px solid #2d2d5e;
+      color: #c8c4f4;
+    }
+    .bubble.assistant {
+      align-self: flex-start;
+      background: #0e2219;
+      border: 1px solid #1a3a28;
+      color: #a8d4b8;
+    }
+    .bubble.error {
+      align-self: center;
+      background: #2a1010;
+      border: 1px solid #5e2020;
+      color: #f4a0a0;
+      font-size: 0.8rem;
+    }
+    .latency-badge {
+      font-size: 0.7rem; color: #555;
+      margin-top: 4px;
+    }
+    .models-bar {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .model-tag {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <h1>Voice Assistant</h1>
+  <p class="subtitle">Silero VAD · Whisper ASR · Groq LLM · Kokoro TTS</p>
+
+  <div class="models-bar" id="models-bar">
+    <span class="model-tag">VAD: silero-vad</span>
+    <span class="model-tag" id="tag-asr">ASR: ...</span>
+    <span class="model-tag" id="tag-llm">LLM: ...</span>
+    <span class="model-tag" id="tag-tts">TTS: ...</span>
+  </div>
+
+  <div class="orb-wrap">
+    <div class="orb" id="orb" onclick="toggleListen()">
+      <span class="orb-icon" id="orb-icon">🎙️</span>
+      <div class="wave-bars" id="wave-bars">
+        <div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status" id="status">Click the mic to begin</div>
+
+  <div class="transcript-area" id="transcript"></div>
+
+  <script>
+    const WS_URL = `ws://${location.host}/ws`;
+
+    let ws = null;
+    let mediaStream = null;
+    let audioContext = null;
+    let processor = null;
+    let isListening = false;
+    let turnStart = 0;
+
+    // Audio playback queue
+    let playQueue = [];
+    let isPlaying = false;
+    const SAMPLE_RATE = 24000;  // Kokoro outputs at 24kHz
+
+    function setStatus(msg, cls = '') {
+      document.getElementById('status').textContent = msg;
+    }
+
+    function setOrbState(state) {
+      const orb = document.getElementById('orb');
+      const icon = document.getElementById('orb-icon');
+      const bars = document.getElementById('wave-bars');
+      orb.className = 'orb ' + state;
+      if (state === 'listening') {
+        icon.style.display = 'none';
+        bars.classList.add('active');
+      } else {
+        icon.style.display = '';
+        bars.classList.remove('active');
+        icon.textContent = state === 'speaking' ? '🔊' : state === 'processing' ? '⏳' : '🎙️';
+      }
+    }
+
+    function addBubble(text, role, latencyMs = null) {
+      const area = document.getElementById('transcript');
+      const div = document.createElement('div');
+      div.className = `bubble ${role}`;
+      div.textContent = text;
+      if (latencyMs) {
+        const lat = document.createElement('div');
+        lat.className = 'latency-badge';
+        lat.textContent = `${Math.round(latencyMs)}ms`;
+        div.appendChild(lat);
+      }
+      area.appendChild(div);
+      area.scrollTop = area.scrollHeight;
+      return div;
+    }
+
+    async function connectWebSocket() {
+      ws = new WebSocket(WS_URL);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => setStatus('Connected — click to speak');
+
+      ws.onmessage = async (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          // Audio from TTS
+          enqueueAudio(event.data);
+        } else {
+          const msg = JSON.parse(event.data);
+          handleServerMessage(msg);
+        }
+      };
+
+      ws.onclose = () => {
+        setStatus('Disconnected');
+        setOrbState('');
+        isListening = false;
+      };
+
+      ws.onerror = () => setStatus('Connection error');
+    }
+
+    function handleServerMessage(msg) {
+      if (msg.type === 'connected') {
+        document.getElementById('tag-asr').textContent = `ASR: ${msg.models.asr}`;
+        document.getElementById('tag-llm').textContent = `LLM: ${msg.models.llm}`;
+        document.getElementById('tag-tts').textContent = `TTS: kokoro/${msg.models.tts}`;
+      }
+      if (msg.type === 'transcript' && msg.is_final && msg.text) {
+        addBubble(msg.text, 'user');
+        setOrbState('processing');
+        setStatus('Thinking...');
+        turnStart = performance.now();
+      }
+      if (msg.type === 'turn_end') {
+        setOrbState('listening');
+        setStatus('Listening...');
+      }
+      if (msg.type === 'error') {
+        addBubble(`Error (${msg.stage}): ${msg.message}`, 'error');
+      }
+    }
+
+    // ── Audio capture ──────────────────────────────────────────────────────
+
+    // ✅ AudioWorklet processor code — injected as a Blob URL
+    const WORKLET_CODE = `
+    class AudioCaptureProcessor extends AudioWorkletProcessor {
+        process(inputs, outputs, parameters) {
+            const input = inputs[0];
+            if (input && input[0]) {
+                // Convert float32 to int16 PCM
+                const float32 = input[0];
+                const int16 = new Int16Array(float32.length);
+                for (let i = 0; i < float32.length; i++) {
+                    int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
+                }
+                // Send PCM bytes to main thread
+                this.port.postMessage(int16.buffer, [int16.buffer]);
+            }
+            return true; // keep processor alive
+        }
+    }
+    registerProcessor('audio-capture-processor', AudioCaptureProcessor);
+    `;
+
+    async function startCapture() {
+        audioContext = new AudioContext({ sampleRate: 16000 });
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                channelCount: 1,
+                sampleRate: 16000,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: false,
+                googNoiseSuppression: true,
+                googHighpassFilter: true,
+                googEchoCancellation: true,
+                suppressLocalAudioPlayback: true,
+            }
+        });
+
+        // Inject worklet code via Blob URL (no separate .js file needed)
+        const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+        const workletUrl = URL.createObjectURL(blob);
+        await audioContext.audioWorklet.addModule(workletUrl);
+        URL.revokeObjectURL(workletUrl); // clean up blob URL
+
+        const source = audioContext.createMediaStreamSource(mediaStream);
+
+        // Create the worklet node — 128 samples per callback at 16kHz = 8ms chunks
+        processor = new AudioWorkletNode(audioContext, 'audio-capture-processor');
+
+        // Receive PCM buffers from worklet thread and send over WebSocket
+        processor.port.onmessage = (event) => {
+            if (!isListening || !ws || ws.readyState !== WebSocket.OPEN) return;
+            ws.send(event.data);
+        };
+
+        const mutedMonitor = audioContext.createGain();
+        mutedMonitor.gain.value = 0;
+        source.connect(processor);
+        processor.connect(mutedMonitor);
+        mutedMonitor.connect(audioContext.destination);
+        console.log('AudioWorklet capture started at 16kHz');
+    }
+    
+
+    function stopCapture() {
+      if (processor) { processor.disconnect(); processor.disconnect(); processor = null; }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+      if (audioContext) { audioContext.close(); audioContext = null; }
+    }
+
+    // ── Audio playback ─────────────────────────────────────────────────────
+
+    let playbackCtx = null;
+
+    function enqueueAudio(pcmBuffer) {
+      if (!playbackCtx) playbackCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
+      const int16 = new Int16Array(pcmBuffer);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768.0;
+
+      const audioBuffer = playbackCtx.createBuffer(1, float32.length, SAMPLE_RATE);
+      audioBuffer.copyToChannel(float32, 0);
+      playQueue.push(audioBuffer);
+
+      if (!isPlaying) playNextChunk();
+    }
+
+    function playNextChunk() {
+      if (playQueue.length === 0) {
+        isPlaying = false;
+        if (!isListening) setOrbState('');
+        return;
+      }
+      isPlaying = true;
+      setOrbState('speaking');
+      setStatus('Speaking...');
+
+      const buf = playQueue.shift();
+      const src = playbackCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(playbackCtx.destination);
+      src.onended = playNextChunk;
+      src.start();
+    }
+
+    // ── Main toggle ────────────────────────────────────────────────────────
+
+    async function toggleListen() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        await connectWebSocket();
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      if (!isListening) {
+        await startCapture();
+        isListening = true;
+        setOrbState('listening');
+        setStatus('Listening — speak now...');
+      } else {
+        stopCapture();
+        isListening = false;
+        setOrbState('');
+        setStatus('Click to speak');
+        ws.send(JSON.stringify({ type: 'stop' }));
+      }
+    }
+
+    // Auto-connect on load
+    connectWebSocket();
+  </script>
+</body>
+</html>
